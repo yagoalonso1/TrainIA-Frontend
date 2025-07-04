@@ -22,21 +22,31 @@ struct HomeView: View {
                         
                         Spacer()
                         
-                        // Avatar del usuario
-                        AsyncImage(url: URL(string: authService.currentUser?.avatarUrl ?? "")) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Image(systemName: "person.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(.accentColor)
+                        // Avatar en la esquina superior derecha
+                        Button(action: { showingProfile = true }) {
+                            if let url = URL(string: authService.currentUser?.avatarUrl ?? ""), !((authService.currentUser?.avatarUrl ?? "").isEmpty) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .foregroundColor(.accentColor)
+                                }
+                                .frame(width: 44, height: 44)
+                                .clipShape(Circle())
+                                .shadow(radius: 3)
+                            } else {
+                                Image(systemName: "person.crop.circle")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 44, height: 44)
+                                    .foregroundColor(.accentColor)
+                            }
                         }
-                        .frame(width: 50, height: 50)
-                        .clipShape(Circle())
-                        .onTapGesture {
-                            showingProfile = true
-                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel("Perfil")
                     }
                     .padding(.horizontal, 20)
                     
@@ -127,42 +137,13 @@ struct HomeView: View {
                 }
                 .padding(.bottom, 30)
             }
-            .navigationBarHidden(true)
-        }
-        .navigationViewStyle(StackNavigationViewStyle())
-        .sheet(isPresented: $showingProfile) {
-            // Vista de perfil (placeholder)
-            NavigationView {
-                VStack(spacing: 20) {
-                    Text("Perfil de Usuario")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    if let user = authService.currentUser {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Nombre: \(user.name)")
-                            Text("Email: \(user.email)")
-                            Text("Rol: \(user.role)")
-                            Text("Suscripción: \(user.subscriptionStatus)")
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
-                    }
-                    
-                    Spacer()
-                }
-                .padding()
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Cerrar") {
-                            showingProfile = false
-                        }
-                    }
-                }
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
+                    .environmentObject(authService)
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
