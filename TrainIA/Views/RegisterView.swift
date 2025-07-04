@@ -1,25 +1,24 @@
 import SwiftUI
 
-struct LoginView: View {
+struct RegisterView: View {
     @EnvironmentObject var authService: AuthService
-    @StateObject private var viewModel = LoginViewModel()
+    @StateObject private var viewModel = RegisterViewModel()
     @Environment(\.dismiss) private var dismiss
-    @State private var navigateToRegister = false
-    @State private var navigateToHome = false
+    @State private var navigateToLogin = false
     @State private var showPassword = false
+    @State private var showConfirmPassword = false
     
     var body: some View {
         GeometryReader { geometry in
             NavigationView {
                 VStack(spacing: geometry.size.height * 0.04) {
-                    // Header
                     VStack(spacing: geometry.size.height * 0.02) {
-                        Image(systemName: "person.circle.fill")
+                        Image(systemName: "person.badge.plus")
                             .font(.system(size: geometry.size.width * 0.18))
                             .foregroundColor(.accentColor)
-                        Text("Iniciar Sesión")
+                        Text("Crear Cuenta")
                             .font(.system(size: geometry.size.width * 0.09, weight: .bold))
-                        Text("Ingresa tus credenciales para acceder")
+                        Text("Regístrate para comenzar a usar TrainIA")
                             .font(.system(size: geometry.size.width * 0.045))
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -28,13 +27,25 @@ struct LoginView: View {
                     
                     Spacer()
                     
-                    // Formulario
                     VStack(spacing: geometry.size.height * 0.02) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            TextField("Ingresa tu email", text: $viewModel.email)
+                        Group {
+                            TextField("Nombre", text: $viewModel.name)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .autocapitalization(.words)
+                                .disableAutocorrection(true)
+                            if !viewModel.name.trimmed.isNotEmpty {
+                                Text("El nombre es obligatorio.")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            if let errors = viewModel.backendFieldErrors["name"] {
+                                ForEach(errors, id: \.self) { error in
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            TextField("Email", text: $viewModel.email)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
@@ -51,18 +62,13 @@ struct LoginView: View {
                                         .foregroundColor(.red)
                                 }
                             }
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Contraseña")
-                                .font(.headline)
-                                .foregroundColor(.primary)
                             ZStack(alignment: .trailing) {
                                 Group {
                                     if showPassword {
-                                        TextField("Ingresa tu contraseña", text: $viewModel.password)
+                                        TextField("Contraseña", text: $viewModel.password)
                                             .textFieldStyle(RoundedBorderTextFieldStyle())
                                     } else {
-                                        SecureField("Ingresa tu contraseña", text: $viewModel.password)
+                                        SecureField("Contraseña", text: $viewModel.password)
                                             .textFieldStyle(RoundedBorderTextFieldStyle())
                                     }
                                 }
@@ -85,6 +91,35 @@ struct LoginView: View {
                                         .foregroundColor(.red)
                                 }
                             }
+                            ZStack(alignment: .trailing) {
+                                Group {
+                                    if showConfirmPassword {
+                                        TextField("Confirmar contraseña", text: $viewModel.confirmPassword)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    } else {
+                                        SecureField("Confirmar contraseña", text: $viewModel.confirmPassword)
+                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    }
+                                }
+                                Button(action: { showConfirmPassword.toggle() }) {
+                                    Image(systemName: showConfirmPassword ? "eye.slash" : "eye")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.trailing, 8)
+                                .accessibilityLabel(showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña")
+                            }
+                            if !viewModel.confirmPassword.isEmpty && viewModel.password != viewModel.confirmPassword {
+                                Text("Las contraseñas no coinciden.")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            if let errors = viewModel.backendFieldErrors["password_confirmation"] {
+                                ForEach(errors, id: \.self) { error in
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, geometry.size.width * 0.08)
@@ -98,10 +133,7 @@ struct LoginView: View {
                     
                     Button(action: {
                         Task {
-                            await viewModel.login()
-                            if authService.isLoggedIn {
-                                navigateToHome = true
-                            }
+                            await viewModel.register()
                         }
                     }) {
                         HStack {
@@ -110,7 +142,7 @@ struct LoginView: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(0.8)
                             }
-                            Text(viewModel.isLoading ? "Iniciando sesión..." : "Iniciar Sesión")
+                            Text(viewModel.isLoading ? "Registrando..." : "Crear Cuenta")
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
@@ -126,9 +158,9 @@ struct LoginView: View {
                     
                     VStack(spacing: 8) {
                         Button(action: {
-                            navigateToRegister = true
+                            navigateToLogin = true
                         }) {
-                            Text("¿No tienes cuenta? Crear cuenta")
+                            Text("¿Ya tienes cuenta? Inicia sesión")
                                 .font(.footnote)
                                 .foregroundColor(.blue)
                                 .underline()
@@ -136,11 +168,19 @@ struct LoginView: View {
                     }
                     .padding(.bottom, geometry.size.height * 0.04)
                     
-                    NavigationLink(destination: HomeView().environmentObject(authService), isActive: $navigateToHome) { EmptyView() }
-                    NavigationLink(destination: RegisterView().navigationBarBackButtonHidden(true), isActive: $navigateToRegister) { EmptyView() }
+                    NavigationLink(destination: LoginView().navigationBarBackButtonHidden(true), isActive: $navigateToLogin) { EmptyView() }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .navigationBarHidden(true)
+                .alert(isPresented: $viewModel.showSuccess) {
+                    Alert(
+                        title: Text("¡Registro exitoso!"),
+                        message: Text(viewModel.successMessage),
+                        dismissButton: .default(Text("Ir a Iniciar Sesión")) {
+                            navigateToLogin = true
+                        }
+                    )
+                }
             }
             .navigationViewStyle(StackNavigationViewStyle())
             .onAppear {
@@ -153,6 +193,6 @@ struct LoginView: View {
 }
 
 #Preview {
-    LoginView()
+    RegisterView()
         .environmentObject(AuthService())
 } 
