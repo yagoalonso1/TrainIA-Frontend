@@ -42,17 +42,13 @@ class AuthService: ObservableObject {
     
     /// Login de usuario
     func login(email: String, password: String) async throws -> LoginResponse {
-        guard !email.isEmpty, !password.isEmpty else {
-            throw AuthError.loginFailed("Email y contraseña son requeridos")
-        }
-        
-        guard let url = URL(string: "\(baseURL)\(Constants.loginEndpoint)") else {
+        guard let url = URL(string: "\(baseURL)/login") else {
             throw AuthError.invalidURL
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue(Constants.contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let loginRequest = LoginRequest(email: email, password: password)
         
@@ -76,17 +72,18 @@ class AuthService: ObservableObject {
                 isLoggedIn = true
                 
                 return loginResponse
-                
             case 401:
-                throw AuthError.loginFailed("Credenciales incorrectas")
-                
+                // Credenciales incorrectas
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Credenciales incorrectas"
+                let errors = json?["errors"] as? [String: [String]] ?? ["email": [message]]
+                throw BackendValidationError(message: message, fieldErrors: errors)
             case 422:
-                if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                    throw AuthError.loginFailed(errorData.message)
-                } else {
-                    throw AuthError.loginFailed("Error de validación")
-                }
-                
+                // Errores de validación
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Errores de validación"
+                let errors = json?["errors"] as? [String: [String]] ?? [:]
+                throw BackendValidationError(message: message, fieldErrors: errors)
             default:
                 if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                     throw AuthError.loginFailed(errorData.message)
@@ -94,8 +91,7 @@ class AuthService: ObservableObject {
                     throw AuthError.loginFailed("Error del servidor")
                 }
             }
-            
-        } catch let error as AuthError {
+        } catch let error as BackendValidationError {
             throw error
         } catch {
             throw AuthError.networkError(error.localizedDescription)
@@ -112,6 +108,49 @@ class AuthService: ObservableObject {
     /// Obtener token para requests autenticados
     func getAuthToken() -> String? {
         return getStoredToken()
+    }
+    
+    /// Registro de usuario
+    func register(name: String, email: String, password: String, passwordConfirmation: String) async throws -> String {
+        guard let url = URL(string: "\(baseURL)/register") else {
+            throw AuthError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: String] = [
+            "name": name,
+            "email": email,
+            "password": password,
+            "password_confirmation": passwordConfirmation
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AuthError.invalidResponse
+            }
+            if httpResponse.statusCode == 201 {
+                // Registro exitoso, decodificar mensaje
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Registro exitoso"
+                return message
+            } else if httpResponse.statusCode == 422 {
+                // Errores de validación
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Errores de validación"
+                let errors = json?["errors"] as? [String: [String]] ?? [:]
+                throw BackendValidationError(message: message, fieldErrors: errors)
+            } else if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw AuthError.loginFailed(errorData.message)
+            } else {
+                throw AuthError.loginFailed("Error desconocido")
+            }
+        } catch let error as BackendValidationError {
+            throw error
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
     }
     
     // MARK: - Private Methods

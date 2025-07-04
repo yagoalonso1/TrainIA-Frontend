@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuView: View {
     @EnvironmentObject var authService: AuthService
+    @State private var navigateToRegister = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -28,8 +29,10 @@ struct MenuView: View {
                     
                     // Botones
                     VStack(spacing: geometry.size.height * 0.02) {
-                        // Botón de Registro (no funcional aún)
-                        Button(action: {}) {
+                        // Botón de Registro
+                        Button(action: {
+                            navigateToRegister = true
+                        }) {
                             HStack {
                                 Image(systemName: "person.badge.plus")
                                     .font(.title2)
@@ -42,8 +45,6 @@ struct MenuView: View {
                             .foregroundColor(.white)
                             .cornerRadius(12)
                         }
-                        .disabled(true)
-                        .opacity(0.6)
                         
                         // Botón de Login
                         NavigationLink(destination: LoginView().navigationBarBackButtonHidden(true)) {
@@ -76,6 +77,8 @@ struct MenuView: View {
                         .opacity(0.7)
                     }
                     .padding(.bottom, geometry.size.height * 0.04)
+                    
+                    NavigationLink(destination: RegisterView().navigationBarBackButtonHidden(true), isActive: $navigateToRegister) { EmptyView() }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .navigationBarHidden(true)
