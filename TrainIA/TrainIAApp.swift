@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 @main
 struct TrainIAApp: App {
@@ -23,10 +24,22 @@ struct TrainIAApp: App {
         }
     }()
 
+    init() {
+        // Forzar solo portrait
+        AppDelegate.orientationLock = .portrait
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    static var orientationLock = UIInterfaceOrientationMask.portrait
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        return AppDelegate.orientationLock
     }
 }
