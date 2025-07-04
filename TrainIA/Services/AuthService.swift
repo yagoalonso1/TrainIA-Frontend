@@ -153,6 +153,81 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Obtener perfil de usuario autenticado
+    func getProfile() async throws -> User {
+        guard let url = URL(string: "\(baseURL)/user") else {
+            throw AuthError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await urlSession.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw AuthError.invalidResponse
+        }
+        let user = try JSONDecoder().decode(User.self, from: data)
+        return user
+    }
+
+    /// Actualizar perfil de usuario (nombre, email, avatar)
+    func updateProfile(name: String?, email: String?, avatar: Data?) async throws -> User {
+        guard let url = URL(string: "\(baseURL)/profile/update") else {
+            throw AuthError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        if let name = name {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"name\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(name)\r\n".data(using: .utf8)!)
+        }
+        if let email = email {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"email\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(email)\r\n".data(using: .utf8)!)
+        }
+        if let avatar = avatar {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"avatar\"; filename=\"avatar.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(avatar)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        let (data, response) = try await urlSession.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+        if httpResponse.statusCode == 200 {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            if let dataDict = json?["data"] as? [String: Any],
+               let userDict = dataDict["user"] {
+                let userData = try JSONSerialization.data(withJSONObject: userDict)
+                let user = try JSONDecoder().decode(User.self, from: userData)
+                return user
+            }
+            throw AuthError.invalidResponse
+        } else if httpResponse.statusCode == 422 {
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let message = json?["message"] as? String ?? "Errores de validación"
+            let errors = json?["errors"] as? [String: [String]] ?? [:]
+            throw BackendValidationError(message: message, fieldErrors: errors)
+        } else if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+            throw AuthError.loginFailed(errorData.message)
+        } else {
+            throw AuthError.loginFailed("Error desconocido")
+        }
+    }
+    
     // MARK: - Private Methods
     
     private func saveToken(_ token: String) {
