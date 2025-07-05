@@ -2,6 +2,9 @@ import Foundation
 
 @MainActor
 class AuthService: ObservableObject {
+    // MARK: - Shared Instance
+    static let shared = AuthService()
+    
     // MARK: - Published Properties
     @Published var currentUser: User?
     @Published var isLoggedIn = false
@@ -26,6 +29,15 @@ class AuthService: ObservableObject {
         self.baseURL = baseURL
         self.userDefaults = userDefaults
         self.urlSession = urlSession
+        
+        checkAuthStatus()
+    }
+    
+    // MARK: - Private Initializer for Singleton
+    private init() {
+        self.baseURL = AppConstants.API.baseURL
+        self.userDefaults = .standard
+        self.urlSession = .shared
         
         checkAuthStatus()
     }
@@ -248,6 +260,62 @@ class AuthService: ObservableObject {
             return message
         } else {
             throw AuthError.loginFailed(message.isEmpty ? "Error al solicitar recuperación" : message)
+        }
+    }
+    
+    /// Cambiar contraseña de usuario autenticado
+    func changePassword(currentPassword: String, newPassword: String) async throws -> ChangePasswordResponse {
+        guard let url = URL(string: "\(baseURL)/change-password") else {
+            throw AuthError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let changePasswordRequest = ChangePasswordRequest(
+            current_password: currentPassword,
+            new_password: newPassword
+        )
+        
+        do {
+            let jsonData = try JSONEncoder().encode(changePasswordRequest)
+            request.httpBody = jsonData
+            
+            let (data, response) = try await urlSession.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AuthError.invalidResponse
+            }
+            
+            switch httpResponse.statusCode {
+            case 200:
+                let changePasswordResponse = try JSONDecoder().decode(ChangePasswordResponse.self, from: data)
+                return changePasswordResponse
+            case 422:
+                // Errores de validación (fortaleza de contraseña, contraseña actual incorrecta, etc.)
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Errores de validación"
+                let errors = json?["errors"] as? [String: [String]] ?? [:]
+                throw BackendValidationError(message: message, fieldErrors: errors)
+            case 401:
+                // Token expirado o inválido
+                throw AuthError.loginFailed("Sesión expirada. Por favor, inicia sesión nuevamente.")
+            default:
+                if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                    throw AuthError.loginFailed(errorData.message)
+                } else {
+                    throw AuthError.loginFailed("Error del servidor")
+                }
+            }
+        } catch let error as BackendValidationError {
+            throw error
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
         }
     }
     
