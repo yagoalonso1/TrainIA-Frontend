@@ -4,6 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showEdit = false
+    @State private var showChangePassword = false
     
     var body: some View {
         NavigationView {
@@ -71,6 +72,38 @@ struct ProfileView: View {
                             .padding(.horizontal, 12)
                         }
                         .padding(.top, 8)
+                        
+                        // Sección de seguridad
+                        VStack(spacing: 0) {
+                            Text("SEGURIDAD")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 8)
+                            VStack(spacing: 0) {
+                                Button(action: { showChangePassword = true }) {
+                                    HStack {
+                                        Image(systemName: "lock.shield")
+                                            .foregroundColor(.blue)
+                                        Text("Cambiar contraseña")
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 20)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                            .background(Color(.systemBackground))
+                            .cornerRadius(16)
+                            .shadow(color: .black.opacity(0.03), radius: 4, y: 2)
+                            .padding(.horizontal, 12)
+                        }
+                        .padding(.top, 8)
                         .padding(.bottom, 24)
                     } else if viewModel.isLoading {
                         ProgressView("Cargando perfil...")
@@ -102,6 +135,10 @@ struct ProfileView: View {
                     EditProfileView(user: user, viewModel: viewModel)
                         .environmentObject(authService)
                 }
+            }
+            .sheet(isPresented: $showChangePassword) {
+                ChangePasswordView()
+                    .environmentObject(authService)
             }
             .onAppear {
                 viewModel.setAuthService(authService)
