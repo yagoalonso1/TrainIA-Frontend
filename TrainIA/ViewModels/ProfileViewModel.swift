@@ -45,6 +45,7 @@ class ProfileViewModel: ObservableObject {
             let avatarData = avatar?.jpegData(compressionQuality: 0.8)
             let user = try await authService.updateProfile(name: name, email: email, avatar: avatarData)
             self.user = user
+            authService.currentUser = user
             showSuccess = true
             successMessage = "Perfil actualizado correctamente"
         } catch let error as BackendValidationError {

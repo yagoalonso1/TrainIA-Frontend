@@ -53,7 +53,13 @@ class LoginViewModel: ObservableObject {
         
         do {
             let _ = try await authService.login(email: email, password: password)
-            // Login exitoso - la navegación se maneja en la vista
+            // Tras login exitoso, refrescar perfil actualizado
+            do {
+                let user = try await authService.getProfile()
+                authService.currentUser = user
+            } catch {
+                // Si falla, al menos sigue con el usuario del login
+            }
         } catch let error as BackendValidationError {
             backendFieldErrors = error.fieldErrors
             showError(message: error.message)
