@@ -8,6 +8,7 @@ class AuthService: ObservableObject {
     // MARK: - Published Properties
     @Published var currentUser: User?
     @Published var isLoggedIn = false
+    @Published var isCheckingAuth = true
     
     // MARK: - Private Properties
     private let baseURL: String
@@ -46,9 +47,22 @@ class AuthService: ObservableObject {
     
     /// Verificar si el usuario está autenticado
     func checkAuthStatus() {
+        isCheckingAuth = true
         if let token = getStoredToken(), !token.isEmpty {
-            // Aquí podrías hacer una llamada para verificar si el token es válido
-            isLoggedIn = true
+            Task {
+                do {
+                    let user = try await getProfile()
+                    self.currentUser = user
+                    self.isLoggedIn = true
+                } catch {
+                    // Token inválido o expirado
+                    self.logout()
+                }
+                self.isCheckingAuth = false
+            }
+        } else {
+            self.logout()
+            self.isCheckingAuth = false
         }
     }
     

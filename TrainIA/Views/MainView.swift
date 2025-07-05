@@ -7,7 +7,22 @@ struct MainView: View {
     
     var body: some View {
         Group {
-            if authService.isLoggedIn {
+            if authService.isCheckingAuth {
+                // Pantalla de carga (Splash)
+                VStack {
+                    Spacer()
+                    Image(systemName: "dumbbell.fill")
+                        .resizable()
+                        .frame(width: 60, height: 60)
+                        .foregroundColor(.accentColor)
+                        .padding(.bottom, 16)
+                    ProgressView("Cargando...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                        .padding()
+                    Spacer()
+                }
+                .background(Color(.systemBackground).ignoresSafeArea())
+            } else if authService.isLoggedIn {
                 HomeView()
                     .environmentObject(authService)
             } else {
