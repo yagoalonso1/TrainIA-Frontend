@@ -7,6 +7,7 @@ struct LoginView: View {
     @State private var navigateToRegister = false
     @State private var navigateToHome = false
     @State private var showPassword = false
+    @State private var showForgotPassword = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -135,6 +136,19 @@ struct LoginView: View {
                         }
                     }
                     .padding(.bottom, geometry.size.height * 0.04)
+                    
+                    // Botón de forgot password
+                    Button(action: { showForgotPassword = true }) {
+                        Text("¿Olvidaste tu contraseña?")
+                            .font(.footnote)
+                            .foregroundColor(.blue)
+                            .underline()
+                    }
+                    .padding(.top, 4)
+                    .sheet(isPresented: $showForgotPassword) {
+                        ForgotPasswordView()
+                            .environmentObject(authService)
+                    }
                     
                     NavigationLink(destination: HomeView().environmentObject(authService), isActive: $navigateToHome) { EmptyView() }
                     NavigationLink(destination: RegisterView().navigationBarBackButtonHidden(true), isActive: $navigateToRegister) { EmptyView() }

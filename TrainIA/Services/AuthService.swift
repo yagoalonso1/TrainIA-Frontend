@@ -228,6 +228,29 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Solicitar recuperación de contraseña
+    func forgotPassword(email: String) async throws -> String {
+        guard let url = URL(string: "\(baseURL)/forgot-password") else {
+            throw AuthError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: String] = ["email": email]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await urlSession.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let message = json?["message"] as? String ?? ""
+        if httpResponse.statusCode == 200 {
+            return message
+        } else {
+            throw AuthError.loginFailed(message.isEmpty ? "Error al solicitar recuperación" : message)
+        }
+    }
+    
     // MARK: - Private Methods
     
     private func saveToken(_ token: String) {
