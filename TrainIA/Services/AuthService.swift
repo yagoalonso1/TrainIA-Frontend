@@ -319,6 +319,92 @@ class AuthService: ObservableObject {
         }
     }
     
+    /// Obtener advertencia de eliminación de cuenta
+    func getDeletionWarning() async throws -> DeletionWarningResponse {
+        guard let url = URL(string: "\(baseURL)/account/deletion-warning") else {
+            throw AuthError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let (data, response) = try await urlSession.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            return try JSONDecoder().decode(DeletionWarningResponse.self, from: data)
+        } else {
+            if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw AuthError.loginFailed(errorData.message)
+            } else {
+                throw AuthError.loginFailed("Error al obtener información de eliminación")
+            }
+        }
+    }
+    
+    /// Eliminar cuenta
+    func deleteAccount(password: String, confirmDeletion: Bool) async throws -> DeleteAccountResponse {
+        guard let url = URL(string: "\(baseURL)/account") else {
+            throw AuthError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let deleteRequest = DeleteAccountRequest(
+            password: password,
+            confirm_deletion: confirmDeletion
+        )
+        
+        do {
+            let jsonData = try JSONEncoder().encode(deleteRequest)
+            request.httpBody = jsonData
+            
+            let (data, response) = try await urlSession.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AuthError.invalidResponse
+            }
+            
+            switch httpResponse.statusCode {
+            case 200:
+                let deleteResponse = try JSONDecoder().decode(DeleteAccountResponse.self, from: data)
+                return deleteResponse
+            case 422:
+                // Errores de validación (contraseña incorrecta, confirmación requerida, etc.)
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let message = json?["message"] as? String ?? "Errores de validación"
+                let errors = json?["errors"] as? [String: [String]] ?? [:]
+                throw BackendValidationError(message: message, fieldErrors: errors)
+            case 401:
+                // Token expirado o inválido
+                throw AuthError.loginFailed("Sesión expirada. Por favor, inicia sesión nuevamente.")
+            default:
+                if let errorData = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                    throw AuthError.loginFailed(errorData.message)
+                } else {
+                    throw AuthError.loginFailed("Error al eliminar la cuenta")
+                }
+            }
+        } catch let error as BackendValidationError {
+            throw error
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
+    }
+    
     // MARK: - Private Methods
     
     private func saveToken(_ token: String) {
