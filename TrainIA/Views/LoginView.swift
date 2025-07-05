@@ -8,6 +8,9 @@ struct LoginView: View {
     @State private var navigateToHome = false
     @State private var showPassword = false
     @State private var showForgotPassword = false
+    var prefilledEmail: String? = nil
+    var onRegisterTap: (() -> Void)? = nil
+    var onRegistered: ((String) -> Void)? = nil
     
     var body: some View {
         GeometryReader { geometry in
@@ -127,7 +130,7 @@ struct LoginView: View {
                     
                     VStack(spacing: 8) {
                         Button(action: {
-                            navigateToRegister = true
+                            onRegisterTap?()
                         }) {
                             Text("¿No tienes cuenta? Crear cuenta")
                                 .font(.footnote)
@@ -159,7 +162,11 @@ struct LoginView: View {
             .navigationViewStyle(StackNavigationViewStyle())
             .onAppear {
                 viewModel.setAuthService(authService)
-                viewModel.clearFields()
+                if let prefilledEmail = prefilledEmail {
+                    viewModel.email = prefilledEmail
+                } else {
+                    viewModel.clearFields()
+                }
             }
         }
         .ignoresSafeArea(.keyboard)

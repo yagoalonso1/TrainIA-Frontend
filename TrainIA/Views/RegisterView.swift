@@ -7,6 +7,8 @@ struct RegisterView: View {
     @State private var navigateToLogin = false
     @State private var showPassword = false
     @State private var showConfirmPassword = false
+    var onRegisterSuccess: ((String) -> Void)? = nil
+    var onLoginTap: (() -> Void)? = nil
     
     var body: some View {
         GeometryReader { geometry in
@@ -158,7 +160,7 @@ struct RegisterView: View {
                     
                     VStack(spacing: 8) {
                         Button(action: {
-                            navigateToLogin = true
+                            onLoginTap?()
                         }) {
                             Text("¿Ya tienes cuenta? Inicia sesión")
                                 .font(.footnote)
@@ -167,8 +169,6 @@ struct RegisterView: View {
                         }
                     }
                     .padding(.bottom, geometry.size.height * 0.04)
-                    
-                    NavigationLink(destination: LoginView().navigationBarBackButtonHidden(true), isActive: $navigateToLogin) { EmptyView() }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .navigationBarHidden(true)
@@ -177,7 +177,8 @@ struct RegisterView: View {
                         title: Text("¡Registro exitoso!"),
                         message: Text(viewModel.successMessage),
                         dismissButton: .default(Text("Ir a Iniciar Sesión")) {
-                            navigateToLogin = true
+                            onRegisterSuccess?(viewModel.email)
+                            dismiss()
                         }
                     )
                 }
